@@ -56,7 +56,7 @@ For requests that require user authorization, an additional `Authorization` head
 
 This specification is also available in [API Blueprint](https://smartkasa.docs.apiary.io/api-description-document) format.
 
-### 📄 License
+### 📝 License
 
 This OpenAPI specification is provided for integration and development purposes. Please refer to [SmartKasa API Integration Rules](https://www.smartkasa.ua/wp-content/uploads/2025/03/ukrtrimeks-api-integracziya.pdf) for API usage policies.
 
@@ -111,6 +111,6 @@ API використовує аутентифікацію через API Key:
 
 Також ця специфікація доступна в форматі [API Blueprint](https://smartkasa.docs.apiary.io/api-description-document).
 
-### 📄 Ліцензія
+### 📝 Ліцензія
 
 Ця OpenAPI специфікація надається для цілей інтеграції та розробки. Будь ласка, зверніться до [Правил інтеграції SmartKasa API](https://www.smartkasa.ua/wp-content/uploads/2025/03/ukrtrimeks-api-integracziya.pdf) щодо політики використання API.
