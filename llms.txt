@@ -1,0 +1,1419 @@
+# SmartKasa API Documentation
+
+> Comprehensive REST API for Ukrainian retail POS systems with fiscal compliance (v1.0.18)
+
+## Overview
+
+**SmartKasa API** is a complete point-of-sale management platform for Ukrainian retail businesses. It provides fiscal cash register operations compliant with Ukrainian State Tax Service (ДПС) requirements, inventory management, employee administration, and sales reporting.
+
+| Property | Value |
+|----------|-------|
+| Base URL | `https://core.smartkasa.ua` |
+| Content-Type | `application/json` |
+| Version | 1.0.18 |
+
+## Authentication
+
+SmartKasa uses a **two-tier authentication system**:
+
+### 1. API Key (Required for ALL requests)
+
+Every request MUST include the `X-API-KEY` header:
+
+```http
+X-API-KEY: your_api_key_here
+```
+
+### 2. User Session Token (Required for most endpoints)
+
+After authentication via `/api/v1/auth/sessions`, include the JWT access token:
+
+```http
+Authorization: Bearer your_access_token_here
+```
+
+### Authentication Flow
+
+```
+1. POST /api/v1/auth/sessions (phone + password) → получаємо access + refresh tokens
+2. Використовуємо access token в Authorization header
+3. Коли access token спливає → POST /api/v1/auth/refresh з refresh token
+4. DELETE /api/v1/auth/sessions/logout для виходу
+```
+
+---
+
+## API Groups (13 functional areas)
+
+1. **Авторизація** (Authentication)
+2. **Термінали** (POS Terminals)
+3. **Торгові точки** (Shops)
+4. **Працівники** (Employees)
+5. **Одиниці виміру** (Unit Types)
+6. **Каталоги** (Categories)
+7. **Товари** (Products)
+8. **Облік товарів** (Inventory Cards)
+9. **Товарні підгрупи** (Product Subgroups)
+10. **Імпорт** (Import)
+11. **Зміни** (Shifts)
+12. **POS** (Receipts & Transactions)
+13. **Звітність** (Reports & Statistics)
+
+---
+
+## 1. Authentication (Авторизація)
+
+### POST /api/v1/auth/sessions
+Create authenticated session with phone number and password.
+
+**Request Body:**
+```json
+{
+  "session": {
+    "phone_number": "380960000006",
+    "password": "123456789"
+  }
+}
+```
+
+**Request:**
+```bash
+curl -X POST https://core.smartkasa.ua/api/v1/auth/sessions \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your_api_key_here" \
+  -d '{"session": {"phone_number": "380960000006", "password": "123456789"}}'
+```
+
+**Response (201 Created):**
+```json
+{
+  "data": {
+    "id": null,
+    "access": "eyJhbGciOiJIUzI1NiJ9...",
+    "access_expires_at": "2021-03-23T13:51:37.000+02:00",
+    "csrf": "aPhV1ZNQyuoTStIlnw7PlSGU8jRMzhsu...",
+    "refresh": "eyJhbGciOiJIUzI1NiJ9...",
+    "refresh_expires_at": "2021-04-22T01:20:43.000+03:00"
+  },
+  "meta": {}
+}
+```
+
+**Error Response (422):**
+```json
+{
+  "errors": {
+    "base": [{"error": "phone_number_or_password_invalid"}]
+  }
+}
+```
+
+---
+
+### POST /api/v1/auth/refresh
+Renew expired access token using refresh token.
+
+**Headers:**
+```http
+X-API-KEY: your_api_key_here
+X-Refresh-Token: your_refresh_token_here
+```
+
+**Response (201):** Same structure as sessions endpoint.
+
+---
+
+### DELETE /api/v1/auth/sessions/logout
+Terminate current session and invalidate tokens.
+
+**Response (200):**
+```json
+{
+  "data": {"id": "49cb6c02-9951-4c6b-9e55-e2d2b615f5bb"},
+  "meta": {}
+}
+```
+
+---
+
+## 2. POS Terminals (Термінали)
+
+### GET /api/v1/pos/terminals
+List POS terminals with filtering and pagination.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| id | integer | No | Terminal ID filter |
+| name | string | No | Terminal name filter |
+| shop_id | integer | No | Shop ID filter |
+| page | integer | No | Page number |
+| per_page | integer | No | Items per page (default: 25) |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": 20007,
+      "activated_at": null,
+      "core_terminal_id": 1,
+      "created_at": "2021-03-22T13:52:06.216+02:00",
+      "name": "Test terminal",
+      "picture": {
+        "id": "cd8479459fe1e42d67d4be153101cbdc",
+        "filename": "test.png",
+        "mime_type": "image/png",
+        "size": 8132,
+        "url": "/uploads/store/cd8479459fe1e42d67d4be153101cbdc"
+      },
+      "properties": null,
+      "serial_number": "108210974046530",
+      "shop_id": 37958,
+      "state": 1,
+      "updated_at": "2021-03-22T13:52:06.216+02:00"
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "next_page": null,
+    "prev_page": null,
+    "total_pages": 1,
+    "total_count": 1,
+    "limit_value": 25,
+    "offset_value": 0
+  }
+}
+```
+
+---
+
+### GET /api/v1/pos/terminals/{id}
+Get single terminal by ID.
+
+---
+
+### PUT /api/v1/pos/terminals/{id}
+Update terminal configuration.
+
+**Request Body:**
+```json
+{
+  "terminal": {
+    "id": 20012,
+    "name": "Updated Terminal Name",
+    "shop_id": 37964
+  }
+}
+```
+
+---
+
+### DELETE /api/v1/pos/terminals/{id}
+Delete terminal.
+
+---
+
+## 3. Shops (Торгові точки)
+
+### GET /api/v1/rsn/shops
+List all shops with optional filtering.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| title | string | Shop name filter |
+| phone_number | string | Phone number |
+| email | string | Email address |
+| state | integer | Status (0=active) |
+| business_category_id | integer | Business category ID |
+| fiscalization_enabled | boolean | Fiscalization flag |
+| is_vat_taxation | boolean | VAT payer flag |
+| is_excise_taxation | boolean | Excise taxation flag |
+| fiscal_numbers | array | List of pRRO numbers |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": 37969,
+      "address": {
+        "id": 38197,
+        "address_type_id": 0,
+        "city_name": "Київ",
+        "content": "пров. Вічева, 17",
+        "zip_code": "08800"
+      },
+      "business_category_id": 1,
+      "email": "shop@example.com",
+      "employees_count": 0,
+      "fiscal_numbers": [],
+      "fiscalization_enabled": false,
+      "is_excise_taxation": false,
+      "is_vat_taxation": true,
+      "owner_id": 1,
+      "phone_number": "0971234567",
+      "state": 0,
+      "terminals_count": 0,
+      "title": "Test shop",
+      "website_url": "https://www.example.com"
+    }
+  ],
+  "meta": {...}
+}
+```
+
+---
+
+### GET /api/v1/rsn/shops/{id}
+Get single shop by ID.
+
+---
+
+### POST /api/v1/rsn/shops
+Create a new shop location.
+
+**Request Body:**
+```json
+{
+  "shop": {
+    "title": "Downtown Store",
+    "email": "downtown@store.com",
+    "phone_number": "0971234567",
+    "state": 0,
+    "website_url": "https://www.downtown-store.com",
+    "business_category_id": 1,
+    "fiscal_numbers": [],
+    "fiscalization_enabled": false,
+    "is_vat_taxation": true,
+    "is_excise_taxation": false,
+    "address": {
+      "zip_code": "01001",
+      "city_name": "Київ",
+      "content": "вул. Хрещатик, 1"
+    }
+  }
+}
+```
+
+---
+
+### PUT /api/v1/rsn/shops/{id}
+Update shop data.
+
+---
+
+### DELETE /api/v1/rsn/shops/{id}
+Delete shop.
+
+---
+
+### GET /api/v1/rsn/shops/employees
+List employees across all shops.
+
+---
+
+## 4. Employees (Працівники)
+
+### GET /api/v1/rsn/employees
+List employees with filtering.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| phone_number | string | Phone number |
+| email | string | Email |
+| first_name | string | First name (Ім'я) |
+| last_name | string | Last name (Прізвище) |
+| middle_name | string | Patronymic (По-Батькові) |
+| inn | string | Tax ID (ІПН) |
+| passport_serial | string | Passport series |
+| passport_number | string | Passport number |
+| role_id | integer | Position ID |
+| pin_code | string | POS access code |
+| gender_type_id | integer | Gender |
+| birthday | datetime | Birthday |
+| joined_at | datetime | Employment start date |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": 1300,
+      "additional_phone_number": null,
+      "birthday": "1980-01-01T00:00:00.000+00:00",
+      "email": "employee@example.com",
+      "first_name": "Богдан",
+      "gender_type_id": 1,
+      "inn": "1234567891",
+      "last_name": "Палій",
+      "middle_name": null,
+      "notes": "Notes about employee",
+      "passport_number": "123456",
+      "passport_serial": "SN",
+      "phone_number": "380970000016",
+      "pin_code": "1234",
+      "role": {
+        "id": 856,
+        "name": "Cashier",
+        "state": 0
+      },
+      "role_id": 856,
+      "state": 0
+    }
+  ],
+  "meta": {...}
+}
+```
+
+---
+
+### GET /api/v1/rsn/employees/{id}
+Get employee by ID.
+
+---
+
+### POST /api/v1/rsn/employees
+Create employee.
+
+**Request Body:**
+```json
+{
+  "employee": {
+    "email": "new@employee.com",
+    "first_name": "Віктор",
+    "middle_name": "Гордійчук",
+    "last_name": "Лагойда",
+    "phone_number": "0971234567",
+    "inn": "1234567891",
+    "pin_code": "1123",
+    "passport_serial": "SN",
+    "passport_number": "123456",
+    "role_id": 854,
+    "address_actual": {
+      "zip_code": "08800",
+      "content": "пров. Вічева, 5"
+    },
+    "address_legal": {
+      "zip_code": "08132",
+      "content": "пр. Нижанківського, 196"
+    },
+    "birthday": "1980-01-01",
+    "joined_at": "2012-01-01",
+    "gender_type_id": 1,
+    "notes": "Employee notes"
+  }
+}
+```
+
+---
+
+### PUT /api/v1/rsn/employees/{id}
+Update employee profile.
+
+---
+
+### DELETE /api/v1/rsn/employees/{id}
+Delete employee.
+
+---
+
+## 5. Unit Types (Одиниці виміру)
+
+### GET /api/v1/inventory/unit_types
+List available unit types.
+
+**Response (200):**
+```json
+{
+  "data": [
+    {"id": 12, "code": 175, "is_visible": true, "is_weighted": false, "name": "Година", "short_name": "год"},
+    {"id": 9, "code": 303, "is_visible": true, "is_weighted": true, "name": "Кілограм", "short_name": "кг"},
+    {"id": 0, "code": 2009, "is_visible": true, "is_weighted": false, "name": "Штука", "short_name": "шт"}
+  ],
+  "meta": {}
+}
+```
+
+---
+
+## 6. Categories (Каталоги)
+
+### GET /api/v1/inventory/categories
+List product categories.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| id | string | Category ID (UUID) |
+| title | string | Category name |
+| parent_id | string | Parent category ID |
+| color_id | integer | Color identifier (enum) |
+| shop_ids | array | Array of shop IDs |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "72c1f7f7-751d-4caf-a0c7-5c8b0314a9f2",
+      "color_id": 0,
+      "parent_id": null,
+      "partner_id": 7711,
+      "products_count": 15,
+      "shop_ids": [],
+      "title": "Beverages"
+    }
+  ],
+  "meta": {...}
+}
+```
+
+---
+
+### POST /api/v1/inventory/categories
+Create a new category.
+
+**Request Body:**
+```json
+{
+  "category": {
+    "title": "New Category",
+    "color_id": 2,
+    "parent_id": null,
+    "shop_ids": []
+  }
+}
+```
+
+---
+
+### PUT /api/v1/inventory/categories/{id}
+Update category.
+
+---
+
+### DELETE /api/v1/inventory/categories/{id}
+Delete category.
+
+---
+
+### POST /api/v1/inventory/categories/batch
+Batch create multiple categories.
+
+**Request Body:**
+```json
+{
+  "batch": {
+    "categories": [
+      {"title": "Category 1", "color": 2},
+      {"title": "Category 2", "color": 3}
+    ]
+  }
+}
+```
+
+---
+
+### DELETE /api/v1/inventory/categories/batch
+Batch delete multiple categories.
+
+**Request Body:**
+```json
+{
+  "batch": {
+    "ids": ["uuid-1", "uuid-2", "uuid-3"]
+  }
+}
+```
+
+---
+
+## 7. Products (Товари)
+
+### GET /api/v1/inventory/products
+List products with search and filtering.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| q | string | Full-text search query (Пошуковий запит) |
+| number | string | Barcode (Штрих-код) |
+| shop_id | integer | Shop ID |
+| subgroup_id | integer | Product subgroup ID |
+| category_id | string | Category ID (UUID) |
+| page | string | Page number |
+| per_page | string | Items per page |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "6ba87885-a4af-47ac-a31a-50de0d6b93ce",
+      "alter_number": "9909720899",
+      "alter_title": "Short title",
+      "bookmark_ids": [],
+      "category_id": "6718d176-b9d2-42d2-a22d-afb7728f0303",
+      "category_type_id": 7537043,
+      "classifier_code": "123456789012345",
+      "classifier_type_id": 1,
+      "is_free_price": false,
+      "is_without_number": false,
+      "number": "1944840247",
+      "owner_id": 103927,
+      "partner_id": 7706,
+      "partner_title": "Supplier Name",
+      "picture": {
+        "id": "fdd86b0b8767eb6397988ce910253990",
+        "filename": "product.png",
+        "mime_type": "image/png",
+        "size": 8132,
+        "url": "/uploads/store/fdd86b0b8767eb6397988ce910253990"
+      },
+      "portion_amount": 800,
+      "portion_type_id": 0,
+      "price": "3064.0",
+      "procurement_price": "100.0",
+      "sold_by_weight": false,
+      "stock": {},
+      "subgroup_id": null,
+      "subgroup_title": null,
+      "tax_amount": {"А": 1520},
+      "tax_group_id": 1,
+      "title": "Product Name",
+      "unit_type_id": 0,
+      "unit_type_name": null,
+      "user_id": 103928
+    }
+  ],
+  "meta": {...}
+}
+```
+
+---
+
+### GET /api/v1/inventory/products/{id}
+Get product details with inventory cards.
+
+**Response includes `cards` array** with stock per shop:
+```json
+{
+  "data": {
+    "id": "f747fbc5-4782-4489-92b4-51691dea1f63",
+    "cards": [
+      {
+        "id": 10789,
+        "count": "100.0",
+        "counting_enabled": true,
+        "product_id": "f747fbc5-4782-4489-92b4-51691dea1f63",
+        "shop_id": 37933
+      }
+    ],
+    "category": {
+      "id": "72c1f7f7-751d-4caf-a0c7-5c8b0314a9f2",
+      "title": "Beverages"
+    },
+    ...
+  }
+}
+```
+
+---
+
+### POST /api/v1/inventory/products
+Create a new product.
+
+**Request Body:**
+```json
+{
+  "product": {
+    "number": "6930426566",
+    "title": "Premium Coffee Beans 1kg",
+    "unit_type_id": 0,
+    "portion_amount": 800,
+    "portion_type_id": 0,
+    "price": 71.89,
+    "procurement_price": 50.0,
+    "classifier_type_id": 2,
+    "classifier_code": "543210123456789",
+    "tax_group_id": 1,
+    "category_id": "992670be-c998-4169-a62c-63bfe2a4e1a0",
+    "category_type_id": 2201372,
+    "sold_by_weight": false,
+    "bookmark_ids": [],
+    "user_id": 103930,
+    "owner_id": 103929
+  }
+}
+```
+
+**Response (201):**
+```json
+{
+  "data": {"id": "7f527f59-bcdb-4bbd-a187-00b6ee7b68f5"},
+  "meta": {}
+}
+```
+
+---
+
+### PATCH /api/v1/inventory/products/{id}
+Update existing product (partial update).
+
+---
+
+### DELETE /api/v1/inventory/products/{id}
+Delete a product.
+
+---
+
+### POST /api/v1/inventory/products/batch
+Batch create multiple products.
+
+**Request Body:**
+```json
+{
+  "products": [
+    {"number": "6930426566", "title": "Coffee 1kg", "price": 299.99, ...},
+    {"number": "6930426567", "title": "Tea 500g", "price": 189.50, ...}
+  ]
+}
+```
+
+---
+
+### DELETE /api/v1/inventory/products/batch
+Batch delete multiple products.
+
+**Request Body:**
+```json
+{
+  "batch": {
+    "ids": ["uuid-1", "uuid-2", "uuid-3"]
+  }
+}
+```
+
+---
+
+## 8. Inventory Cards (Облік товарів)
+
+### GET /api/v1/inventory/cards
+List inventory cards (stock per shop).
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| id | integer | Card ID |
+| product_id | string | Product ID (UUID) |
+| shop_id | integer | Shop ID |
+| counting_enabled | boolean | Stock tracking flag (Ознака відслідковування залишків) |
+| count | float | Quantity filter |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": 10767,
+      "count": "3.5",
+      "counting_enabled": true,
+      "owner_id": 103881,
+      "product": {...},
+      "product_id": "a327c691-1542-4b65-b8cd-05c51847bcad",
+      "shop": {...},
+      "shop_id": 37916
+    }
+  ],
+  "meta": {...}
+}
+```
+
+---
+
+### GET /api/v1/inventory/cards/{id}
+Get single inventory card.
+
+---
+
+### POST /api/v1/inventory/cards
+Create inventory card.
+
+**Request Body:**
+```json
+{
+  "card": {
+    "product_id": "a327c691-1542-4b65-b8cd-05c51847bcad",
+    "shop_id": 37916,
+    "count": 100.0,
+    "counting_enabled": true
+  }
+}
+```
+
+---
+
+### PUT /api/v1/inventory/cards/{id}
+Update inventory card.
+
+---
+
+### DELETE /api/v1/inventory/cards/{id}
+Delete inventory card.
+
+---
+
+## 9. Product Subgroups (Товарні підгрупи)
+
+### GET /api/v1/inventory/product_subgroups
+List product subgroups.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| id | integer | Subgroup ID |
+| title | string | Subgroup name |
+
+---
+
+### POST /api/v1/inventory/product_subgroups
+Create subgroup.
+
+**Request Body:**
+```json
+{
+  "subgroup": {
+    "title": "New Subgroup"
+  }
+}
+```
+
+---
+
+### PUT /api/v1/inventory/product_subgroups/{id}
+Update subgroup.
+
+---
+
+### DELETE /api/v1/inventory/product_subgroups/{id}
+Delete subgroup.
+
+---
+
+## 10. Import
+
+### GET /api/v1/inventory/import_products
+Get import status.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| url | string | File URL (Посилання на файл) |
+| category_id | string | Target category ID |
+
+---
+
+### POST /api/v1/inventory/import_products
+Start product import from file.
+
+**Request Body:**
+```json
+{
+  "import": {
+    "url": "https://example.com/products.csv",
+    "category_id": "992670be-c998-4169-a62c-63bfe2a4e1a0"
+  }
+}
+```
+
+---
+
+### GET /api/v1/inventory/import_products/{id}
+Get import job status by ID.
+
+---
+
+## 11. Shifts (Зміни)
+
+### GET /api/v1/pos/shifts
+List shifts with filtering.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| id | string | Shift ID (UUID) |
+| remote_shift_id | string | DPS server shift ID (Ідентифікатор торгової зміни на сервері ДПС) |
+| fiscal_number | string | Fiscal number |
+| cash_balance | float | Cash in register (Готівка в касі) |
+| device_uid | string | Device unique ID |
+| registrar_fiscal_number | string | pRRO fiscal number |
+| opened_by | string | Opened by (name) |
+| closed_by | string | Closed by (name) |
+| state | integer | Status: 0=open, 1=closed, 2=archived |
+| terminal_user_id | integer | Terminal user ID |
+| employee_id | integer | Employee ID |
+| terminal_id | integer | Terminal ID |
+| page | integer | Page number |
+| per_page | integer | Items per page |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "03bc8594-bf71-4ee0-b3ee-27f35379cf8d",
+      "cash_balance": "0.99",
+      "closed_at": null,
+      "closed_by": null,
+      "device_uid": "78b341e8-a400-4c5d-a5ad-2d4ab7b816a2",
+      "employee_id": null,
+      "fiscal_number": "Shift fiscal number",
+      "opened_at": "2021-03-22T11:52:05.594+02:00",
+      "opened_by": "John Dow",
+      "registrar_fiscal_number": null,
+      "remote_shift_id": "67969f57-f512-4a46-b6eb-df71020008bb",
+      "state": 0,
+      "terminal_id": 19987,
+      "terminal_user_id": null
+    }
+  ],
+  "meta": {...}
+}
+```
+
+---
+
+### GET /api/v1/pos/shifts/{id}
+Get single shift details.
+
+---
+
+## 12. POS (Receipts & Transactions)
+
+### GET /api/v1/pos/receipts
+List receipts with filtering.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| id | string | Receipt ID (UUID) |
+| shift_id | string | Shift ID |
+| shop_id | integer | Shop ID |
+| terminal_id | integer | Terminal ID |
+| state | integer | Status (see Receipt States) |
+| type | integer | Type (see Receipt Types) |
+| fiscal_number | string | Fiscal number |
+| registrar_fiscal_number | string | pRRO fiscal number |
+| cashier_name | string | Cashier name |
+| title | string | Receipt title |
+| total_amount | float | Total amount |
+| discount_type_id | integer | Discount type (0=percentage, 1=money) |
+| discount_amount | float | Discount amount |
+| discount_percentage | float | Discount percentage |
+| seller_id | integer | Seller ID |
+| rounding_amount | float | Rounding amount |
+| offline_id | integer | Offline shift ID |
+| offline_seed | string | Offline secret |
+| offline_local_number | integer | Offline local number |
+| previous_receipt_hash | string | Previous receipt hash |
+| related_fiscal_number | string | Related fiscal number (for refunds) |
+| is_hidden | boolean | Hidden receipt flag |
+| page | integer | Page number |
+| per_page | integer | Items per page |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "4683e036-598e-44a5-9d89-00a92c9728c9",
+      "cashier_name": "John Doe",
+      "created_at": "2021-07-06T20:26:14.730+00:00",
+      "description": null,
+      "discount_amount": "0.0",
+      "discount_percentage": "0.0",
+      "discount_type_id": 0,
+      "fiscal_number": "16773376",
+      "is_hidden": false,
+      "items": [
+        {
+          "id": "e3a4acdd-49af-4346-ad9a-8bd4e5860d0d",
+          "amount": "1438.0",
+          "classifier_code": "123",
+          "classifier_type_id": 1,
+          "description": "",
+          "is_free_price": false,
+          "is_product": true,
+          "name": "Алкоголь",
+          "price": "1438.0",
+          "product_id": "f3ba907b-c718-4949-91ee-4dfdfa88d12c",
+          "quantity": "1.0",
+          "receipt_id": "4683e036-598e-44a5-9d89-00a92c9728c9",
+          "sku": null,
+          "sold_by_weight": false,
+          "stock_item_id": 1,
+          "tax_group_id": 6,
+          "unit_type_id": 2009,
+          "unit_type_name": "шт"
+        }
+      ],
+      "payment_transactions": [
+        {
+          "id": "7d523a18-e812-43f3-beb5-85a0029f5f86",
+          "amount": "1438.0",
+          "approval_code": null,
+          "change_amount": "0.0",
+          "deposit_amount": "1438.0",
+          "payment_type_id": 0,
+          "receipt_id": "4683e036-598e-44a5-9d89-00a92c9728c9",
+          "rrn": "162Q560ZQ3I174JY431",
+          "state": 1,
+          "timestamp": "2021-07-06T20:26:14.433+00:00",
+          "transaction_type_id": 0
+        }
+      ],
+      "registrar_fiscal_number": "4000026885",
+      "shop_id": 13,
+      "state": 2,
+      "tax_amount": {"А": 22825, "З": 6848},
+      "terminal_id": null,
+      "title": "",
+      "total_amount": "1438.0",
+      "type": 0
+    }
+  ],
+  "meta": {...}
+}
+```
+
+---
+
+### GET /api/v1/pos/receipts/{id}
+Get single receipt with items.
+
+---
+
+### POST /api/v1/pos/receipts
+Create a new sales receipt.
+
+**Request Body:**
+```json
+{
+  "receipt": {
+    "title": "new receipt",
+    "total_amount": 145,
+    "state": 2,
+    "type": 0,
+    "discount_amount": 15,
+    "seller_id": 1,
+    "shift_id": null,
+    "fiscal_number": "123456789012345",
+    "registrar_fiscal_number": "123456789054321",
+    "cashier_name": "John Doe",
+    "description": "Sale description",
+    "tax_amount": {"А": 23.5},
+    "is_hidden": false,
+    "items": [
+      {
+        "name": "Product Name",
+        "price": 70.5,
+        "amount": 246.75,
+        "quantity": 3.5,
+        "sku": "SKU-001",
+        "tax_group_id": 1,
+        "is_product": true,
+        "product_id": "db8b8402-cd2a-4ad1-947f-bc521ca5f13f",
+        "stock_item_id": 1,
+        "unit_type_id": 0,
+        "description": "Item description"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### PUT /api/v1/pos/receipts/{id}
+Update receipt data.
+
+---
+
+### DELETE /api/v1/pos/receipts/{id}
+Delete a receipt.
+
+---
+
+### POST /api/v1/pos/receipts/batch
+Batch create multiple receipts.
+
+---
+
+### DELETE /api/v1/pos/receipts/batch
+Batch delete multiple receipts.
+
+**Request Body:**
+```json
+{
+  "batch": {
+    "ids": ["uuid-1", "uuid-2", "uuid-3"]
+  }
+}
+```
+
+---
+
+### GET /api/v1/pos/payment_transactions/{id}
+Get payment transaction by ID.
+
+---
+
+## 13. Reports (Звітність)
+
+### GET /api/v1/reports/z-reports
+Get Z-reports (daily fiscal closure reports) for tax compliance.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| date_start | string | Start date (ISO 8601) |
+| date_end | string | End date (ISO 8601) |
+| shop_id | integer | Shop ID |
+| terminal_id | integer | Terminal ID |
+| terminal_user_id | integer | Cashier ID |
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": 51,
+      "cash_amount": 0,
+      "cash_receipts_count": 4,
+      "cash_total": 12276.25,
+      "created_at": "2021-08-06T13:23:09.020+00:00",
+      "fiscal_number": "7069483",
+      "payload": {
+        "cash": {"total": 12276.25, "commission": 0, "receipts_count": 4},
+        "cashierName": "Андрій Миколайович Солопчук",
+        "fiscalNumber": "7069483",
+        "registrarFiscalNumber": "4000026885"
+      },
+      "refund_cash_total": 0,
+      "refund_cashless_total": 0,
+      "refund_receipts_count": 0,
+      "refund_total": 0,
+      "registrar_fiscal_number": "4000026885",
+      "sale_cash_total": 0,
+      "sale_cashless_total": 0,
+      "sale_receipts_count": 0,
+      "sale_total": 0,
+      "service_input": 0,
+      "service_output": 0,
+      "shift": {
+        "id": "55dc9a5e-9308-4bfc-a3b7-382a67667aa9",
+        "cash_balance": "0.99",
+        "opened_by": "John Dow",
+        "state": 0
+      },
+      "shift_id": "55dc9a5e-9308-4bfc-a3b7-382a67667aa9",
+      "shop": {...},
+      "shop_id": 155,
+      "terminal_id": 297,
+      "terminal_user_name": "Щастислав Павленко",
+      "turnover_amount": 0
+    }
+  ],
+  "meta": {...}
+}
+```
+
+---
+
+### GET /api/v1/stats/product_daily_sales/alter
+Get daily product sales statistics.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| date_start | string | Start date (ISO 8601) |
+| date_end | string | End date (ISO 8601) |
+| shop_id | integer | Shop ID |
+
+**Response (200):**
+```json
+{
+  "data": {
+    "id": 0,
+    "products": [
+      {
+        "id": "53dc610f-f9c2-4c96-a9bf-663c3fe2f780",
+        "category_id": "c73aeff8-b54a-42be-a498-f3b31d40eb77",
+        "number": "1516986502",
+        "popularity": "100.0",
+        "price": "8677.0",
+        "title": "Product Name",
+        "total_amount": "75.6",
+        "total_count": "1.5",
+        "unit_type_id": 0
+      }
+    ],
+    "total_amount": 75.6,
+    "total_count": 1.5
+  },
+  "meta": {}
+}
+```
+
+---
+
+## Data Schemas
+
+### Product Schema
+
+```json
+{
+  "id": "string (UUID, required) - Ідентифікатор товару",
+  "remote_id": "string - Ідентифікатор товару в зовнішній системі",
+  "number": "string - Штрих-код",
+  "title": "string (required) - Назва товару",
+  "unit_type_id": "number - Код одиниці виміру",
+  "price": "number (required) - Ціна за одиницю",
+  "procurement_price": "number - Ціна закупки",
+  "alter_title": "string - Коротка назва",
+  "alter_number": "string - Артикул",
+  "category_id": "string (UUID) - Ідентифікатор каталогу",
+  "sold_by_weight": "boolean - Ознака вагового товару",
+  "is_free_price": "boolean - Ознака продажу по вільній ціні",
+  "classifier_code": "string - Код класифікатора",
+  "classifier_type_id": "enum - Тип класифікатора (see below)",
+  "tax_group_id": "enum - Податкова група (see below)",
+  "subgroup_id": "number - Ідентифікатор товарної підгрупи",
+  "picture": "object - Об'єкт файлу",
+  "bookmark_ids": "array - Помітки"
+}
+```
+
+### Classifier Types (classifier_type_id)
+
+| Value | Description |
+|-------|-------------|
+| 0 | Не обрано (default) |
+| 1 | УКТЗЕД |
+| 2 | ДКПП |
+
+### Tax Groups (tax_group_id)
+
+| Value | Code | Rate | Description |
+|-------|------|------|-------------|
+| 0 | - | - | Не обрано/загальна група (default) |
+| 1 | А | 20% | ПДВ 20% |
+| 2 | Б | 7% | ПДВ 7% |
+| 3 | В | 0% | ПДВ 0% |
+| 4 | Г | - | Без ПДВ |
+| 5 | Д | 5% | Акциз 5% |
+| 6 | - | - | Акциз 5% + ПДВ 20% |
+| 7 | - | - | Акциз 5% + ПДВ 0% |
+| 8 | - | 0% | Акциз (Г) 0% |
+| 9 | - | - | Акциз (Г) 0% + ПДВ (А) 20% |
+| 10 | - | - | Акциз (Г) 0% + ПДВ (В) 0% |
+
+### Receipt States (state)
+
+| Value | Description |
+|-------|-------------|
+| 1 | Відкладений чек (Draft) |
+| 2 | Оплачений чек (Completed) |
+| 3 | Повернення (Refund) |
+
+### Receipt Types (type)
+
+| Value | Description |
+|-------|-------------|
+| 0 | Продаж (Sale) |
+| 1 | Службове внесення (Service input) |
+| 2 | Службова виїмка (Service output) |
+| 3 | Повернення (Refund) |
+| 4 | Відміна (Cancel) |
+| 5 | Видача готівки (Cash withdrawal) |
+| 102 | Початок офлайн режиму |
+| 103 | Закінчення офлайн режиму |
+
+### Transaction Types (transaction_type_id)
+
+| Value | Description |
+|-------|-------------|
+| 0 | Готівка (Cash) |
+| 1 | Картка (Card) |
+| 2 | Еквайринг (Acquiring) |
+| 3 | За реквізитами IBAN (Bank transfer) |
+| 4 | Переказ з картки (Card transfer) |
+
+### Payment Types (payment_type_id)
+
+| Value | Description |
+|-------|-------------|
+| 0 | Оплата (Payment) |
+| 1 | Відміна (Cancel) |
+| 2 | Повернення (Refund) |
+
+### Shift States
+
+| Value | Description |
+|-------|-------------|
+| 0 | Open (Відкрита) |
+| 1 | Closed (Закрита) |
+| 2 | Archived |
+
+---
+
+## Pagination
+
+All list endpoints support pagination with consistent metadata:
+
+**Query Parameters:**
+- `page` - Page number (starts from 1)
+- `per_page` - Items per page (default: 25)
+
+**Response Metadata:**
+```json
+{
+  "meta": {
+    "current_page": 1,
+    "next_page": 2,
+    "prev_page": null,
+    "total_pages": 10,
+    "total_count": 245,
+    "limit_value": 25,
+    "offset_value": 0
+  }
+}
+```
+
+---
+
+## Error Handling
+
+### Standard Error Response
+
+```json
+{
+  "errors": {
+    "field_name": [
+      {"error": "error_code"}
+    ]
+  }
+}
+```
+
+### Validation Error (String format)
+
+```json
+{
+  "errors": "[FormClass.new] \"wrong\" (String) has invalid type for :field_name violates constraints"
+}
+```
+
+### HTTP Status Codes
+
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request - validation errors |
+| 401 | Unauthorized - invalid/missing auth |
+| 403 | Forbidden - insufficient permissions |
+| 404 | Not Found |
+| 422 | Unprocessable Entity - validation failed |
+| 500 | Internal Server Error |
+
+---
+
+## Complete Endpoints List
+
+### Authentication
+- `POST /api/v1/auth/sessions` - Login
+- `POST /api/v1/auth/refresh` - Refresh token
+- `DELETE /api/v1/auth/sessions/logout` - Logout
+
+### Terminals
+- `GET /api/v1/pos/terminals` - List terminals
+- `GET /api/v1/pos/terminals/{id}` - Get terminal
+- `PUT /api/v1/pos/terminals/{id}` - Update terminal
+- `DELETE /api/v1/pos/terminals/{id}` - Delete terminal
+
+### Shops
+- `GET /api/v1/rsn/shops` - List shops
+- `GET /api/v1/rsn/shops/{id}` - Get shop
+- `POST /api/v1/rsn/shops` - Create shop
+- `PUT /api/v1/rsn/shops/{id}` - Update shop
+- `DELETE /api/v1/rsn/shops/{id}` - Delete shop
+- `GET /api/v1/rsn/shops/employees` - List shop employees
+
+### Employees
+- `GET /api/v1/rsn/employees` - List employees
+- `GET /api/v1/rsn/employees/{id}` - Get employee
+- `POST /api/v1/rsn/employees` - Create employee
+- `PUT /api/v1/rsn/employees/{id}` - Update employee
+- `DELETE /api/v1/rsn/employees/{id}` - Delete employee
+
+### Unit Types
+- `GET /api/v1/inventory/unit_types` - List unit types
+
+### Categories
+- `GET /api/v1/inventory/categories` - List categories
+- `POST /api/v1/inventory/categories` - Create category
+- `PUT /api/v1/inventory/categories/{id}` - Update category
+- `DELETE /api/v1/inventory/categories/{id}` - Delete category
+- `POST /api/v1/inventory/categories/batch` - Batch create categories
+- `DELETE /api/v1/inventory/categories/batch` - Batch delete categories
+
+### Products
+- `GET /api/v1/inventory/products` - List products
+- `GET /api/v1/inventory/products/{id}` - Get product
+- `POST /api/v1/inventory/products` - Create product
+- `PATCH /api/v1/inventory/products/{id}` - Update product
+- `DELETE /api/v1/inventory/products/{id}` - Delete product
+- `POST /api/v1/inventory/products/batch` - Batch create products
+- `DELETE /api/v1/inventory/products/batch` - Batch delete products
+
+### Inventory Cards
+- `GET /api/v1/inventory/cards` - List cards
+- `GET /api/v1/inventory/cards/{id}` - Get card
+- `POST /api/v1/inventory/cards` - Create card
+- `PUT /api/v1/inventory/cards/{id}` - Update card
+- `DELETE /api/v1/inventory/cards/{id}` - Delete card
+
+### Product Subgroups
+- `GET /api/v1/inventory/product_subgroups` - List subgroups
+- `POST /api/v1/inventory/product_subgroups` - Create subgroup
+- `PUT /api/v1/inventory/product_subgroups/{id}` - Update subgroup
+- `DELETE /api/v1/inventory/product_subgroups/{id}` - Delete subgroup
+
+### Import
+- `GET /api/v1/inventory/import_products` - Get import status
+- `POST /api/v1/inventory/import_products` - Start import
+- `GET /api/v1/inventory/import_products/{id}` - Get import job
+
+### Shifts
+- `GET /api/v1/pos/shifts` - List shifts
+- `GET /api/v1/pos/shifts/{id}` - Get shift
+
+### Receipts
+- `GET /api/v1/pos/receipts` - List receipts
+- `GET /api/v1/pos/receipts/{id}` - Get receipt
+- `POST /api/v1/pos/receipts` - Create receipt
+- `PUT /api/v1/pos/receipts/{id}` - Update receipt
+- `DELETE /api/v1/pos/receipts/{id}` - Delete receipt
+- `POST /api/v1/pos/receipts/batch` - Batch create receipts
+- `DELETE /api/v1/pos/receipts/batch` - Batch delete receipts
+
+### Payment Transactions
+- `GET /api/v1/pos/payment_transactions/{id}` - Get transaction
+
+### Reports
+- `GET /api/v1/reports/z-reports` - Get Z-reports
+- `GET /api/v1/stats/product_daily_sales/alter` - Get product sales stats

@@ -1,5 +1,6 @@
 # OpenAPI parser
 smartkasa-parser/
+smartkasa-mcp-server/
 
 # Dependencies
 node_modules/
