@@ -54,7 +54,7 @@ For requests that require user authorization, an additional `Authorization` head
 
 ### 📦 Original Format
 
-This specification was converted from [API Blueprint](https://smartkasa.docs.apiary.io/api-description-document) format.
+This specification is also available in [API Blueprint](https://smartkasa.docs.apiary.io/api-description-document) format.
 
 ### 📄 License
 
@@ -109,7 +109,7 @@ API використовує аутентифікацію через API Key:
 
 ### 📦 Оригінальний формат
 
-Ця специфікація була конвертована з формату [API Blueprint](https://smartkasa.docs.apiary.io/api-description-document).
+Також ця специфікація доступна в форматі [API Blueprint](https://smartkasa.docs.apiary.io/api-description-document).
 
 ### 📄 Ліцензія
 

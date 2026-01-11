@@ -22,7 +22,7 @@ info:
     url: https://smartkasa.ua
   license:
     name: Proprietary
-    url: https://smartkasa.ua/terms
+    url: https://www.smartkasa.ua/wp-content/uploads/2025/03/ukrtrimeks-api-integracziya.pdf
 servers:
   - url: https://core.smartkasa.ua
     description: SmartKasa Production API Server
